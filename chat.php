@@ -4,42 +4,51 @@ session_start(); // starting a session for the current user
 $userId = $_SESSION['user_id']; // using the user ID obtained from the login
 
 function fetchChats($conn, $userId) {
+    // Query to fetch all chat members' display names excluding the current user
     $query = "
         SELECT 
             c.chat_id, 
-            u.display_name AS creator_name,
+            GROUP_CONCAT(u.display_name ORDER BY u.display_name SEPARATOR ', ') AS members_names, 
             m.body AS latest_message, 
             m.timestamp AS latest_timestamp
         FROM Chat c
         JOIN Chat_Members cm ON cm.chat_id = c.chat_id
-        JOIN User u ON u.user_id = c.creator_id
+        JOIN User u ON u.user_id = cm.user_id
         LEFT JOIN Message m ON m.chat_id = c.chat_id
-        WHERE cm.user_id = $userId 
+        WHERE cm.user_id != $userId
+        AND cm.chat_id IN (SELECT chat_id FROM Chat_Members WHERE user_id = $userId)
         AND m.timestamp = (
             SELECT MAX(timestamp) 
             FROM Message 
             WHERE chat_id = c.chat_id
         )
+        GROUP BY c.chat_id, m.body, m.timestamp
         ORDER BY latest_timestamp DESC;
-    "; // using SQL statements to retrieve the chats that the user is part of
+    ";
 
-    $result = $conn->query($query); // using a lambda function to send the query via the PHP-SQL connection
-    $chatsHTML = ''; // preparing a blank HTML code for adding all dynamic content later on
+    $result = $conn->query($query);
+    $chatsHTML = ''; // Initialize HTML content for chat list
 
-    date_default_timezone_set('UTC'); // setting the timezone of the server as UTC
+    date_default_timezone_set('UTC'); // Ensure UTC timezone for timestamp formatting
     
     while ($row = $result->fetch_assoc()) {
-        $timestamp = new DateTime($row['latest_timestamp']); // formatting the timestamp to be more user-friendly
-        $latestDate = $timestamp->format('d-m-Y'); // date format for the conversation flow
-        $latestTime = $timestamp->format('H:i:s'); // time format for the individual messages
+        $timestamp = new DateTime($row['latest_timestamp']); // Format timestamp
+        $latestDate = $timestamp->format('d-m-Y'); // Format date
+        $latestTime = $timestamp->format('H:i:s'); // Format time
+        
+        // If only one receiver, display their name, otherwise show group chat members
+        $membersDisplayNames = $row['members_names']; // Concatenated member names
+
         $chatsHTML .= "<div class='chat-entry' data-chat-id='{$row['chat_id']}'>
-                        <strong>{$row['creator_name']}</strong><br>
+                        <strong>{$membersDisplayNames}</strong><br>
                         <span>{$row['latest_message']}</span><br>
                         <small class='timestamp-time'>{$latestDate} {$latestTime}</small>
-                        </div>"; // template HTML block for each chat
+                        </div>"; // Template HTML block for each chat
     }
-    return $chatsHTML; // add all the chats to the collection of HTML code and return
+
+    return $chatsHTML; // Return the HTML content for all chats
 }
+
 
 function fetchMessages($conn, $userId, $chatId) {
     $query = "
@@ -113,54 +122,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sendMessage'])) {
 
 
 // Check if an existing chat exists with a user
-function checkExistingChat($conn, $userId, $targetUserId) {
+function getOrCreateChat($conn, $userId, $targetUserId) {
     $query = "
         SELECT c.chat_id
         FROM Chat c
         JOIN Chat_Members cm1 ON cm1.chat_id = c.chat_id
         JOIN Chat_Members cm2 ON cm2.chat_id = c.chat_id
-        WHERE cm1.user_id = $userId AND cm2.user_id = $targetUserId
+        WHERE cm1.user_id = ? AND cm2.user_id = ?
         LIMIT 1
     ";
 
-    $result = $conn->query($query);
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('ii', $userId, $targetUserId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($row = $result->fetch_assoc()) {
         return json_encode(['exists' => true, 'chatId' => $row['chat_id']]);
-    } else {
-        return json_encode(['exists' => false]);
-    }
-}
-
-// Create a new chat
-function createNewChat($conn, $userId, $targetUserId) {
-    if (!$targetUserId || !is_numeric($targetUserId)) {
-        return json_encode(['error' => 'Invalid user ID']);
     }
 
+    // No existing chat; create a new one
     $stmt = $conn->prepare("INSERT INTO Chat (creator_id) VALUES (?)");
     $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $chatId = $conn->insert_id;
 
-    if ($stmt->execute()) {
-        $chatId = $conn->insert_id;
+    // Add users to the chat
+    $memberStmt = $conn->prepare("INSERT INTO Chat_Members (chat_id, user_id, role) VALUES (?, ?, ?)");
+    $roles = [['creator', $userId], ['member', $targetUserId]];
 
-        // Add users to the chat
-        $memberStmt = $conn->prepare("INSERT INTO Chat_Members (chat_id, user_id, role) VALUES (?, ?, ?)");
-        $roles = [['creator', $userId], ['member', $targetUserId]];
-
-        foreach ($roles as [$role, $user]) {
-            $memberStmt->bind_param('iis', $chatId, $user, $role);
-            if (!$memberStmt->execute()) {
-                return json_encode(['error' => 'Failed to add members to the chat']);
-            }
-        }
-        $memberStmt->close();
-
-        return json_encode(['success' => true, 'chatId' => $chatId]);
-    } else {
-        return json_encode(['error' => 'Failed to create a new chat']);
+    foreach ($roles as [$role, $user]) {
+        $memberStmt->bind_param('iis', $chatId, $user, $role);
+        $memberStmt->execute();
     }
+    $memberStmt->close();
+
+    return json_encode(['success' => true, 'chatId' => $chatId]);
 }
+
 
 // Action handling based on GET request
 $action = $_GET['action'] ?? null;
@@ -171,13 +170,9 @@ if ($action === 'fetchChats') {
     $chatId = $_GET['chat_id'];
     echo fetchMessages($conn, $userId, $chatId);
     exit;
-} elseif ($action === 'checkExistingChat') {
+} elseif ($action === 'getOrCreateChat') {
     $targetUserId = $_GET['userId'];
-    echo checkExistingChat($conn, $userId, $targetUserId);
-    exit;
-} elseif ($action === 'createNewChat') {
-    $targetUserId = $_GET['userId'];
-    echo createNewChat($conn, $userId, $targetUserId);
+    echo getOrCreateChat($conn, $userId, $targetUserId);
     exit;
 }
 ?>

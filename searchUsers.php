@@ -3,28 +3,61 @@ include 'db_connection.php';
 session_start();
 
 $query = $_GET['query'] ?? '';
-$userId = $_SESSION['user_id']; // Assuming this session variable exists for the logged-in user
+$userId = $_SESSION['user_id'] ?? null;
+
+// Response array for easier debugging
+$response = [
+    'status' => 'ok',
+    'users' => [],
+    'query' => $query,
+    'userId' => $userId,
+    'error' => null,
+];
 
 if ($query) {
-    // Fetch users matching the search query, excluding the current user
-    $stmt = $conn->prepare("SELECT user_id, display_name FROM User WHERE display_name LIKE ? AND user_id != ?");
-    $likeQuery = '%' . $query . '%';
-    $stmt->bind_param('si', $likeQuery, $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    if ($userId !== null) {
+        try {
+            $stmt = $conn->prepare("
+                SELECT user_id, display_name 
+                FROM User 
+                WHERE (LOWER(display_name) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?)) 
+                AND user_id != ?
+            ");
+            $likeQuery = '%' . $query . '%';
+            $stmt->bind_param('ssi', $likeQuery, $likeQuery, $userId);
 
-    $usersHTML = '';
-    while ($row = $result->fetch_assoc()) {
-        $usersHTML .= "<li class='user-result' data-user-id='{$row['user_id']}'>
-                           {$row['display_name']}
-                       </li>";
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+
+                // Fetch results
+                while ($row = $result->fetch_assoc()) {
+                    $response['users'][] = $row;
+                }
+            } else {
+                $response['status'] = 'error';
+                $response['error'] = 'Failed to execute query: ' . $stmt->error;
+            }
+        } catch (Exception $e) {
+            $response['status'] = 'error';
+            $response['error'] = 'Exception: ' . $e->getMessage();
+        } finally {
+            if (isset($stmt)) {
+                $stmt->close();
+            }
+        }
+    } else {
+        $response['status'] = 'error';
+        $response['error'] = 'User ID not found in session';
     }
-
-    echo $usersHTML ?: '<li>No users found</li>';
-    $stmt->close();
 } else {
-    echo '<li>Please enter a search term</li>';
+    $response['status'] = 'error';
+    $response['error'] = 'No search query provided';
 }
 
+// Close the database connection
 $conn->close();
+
+// Send response as JSON
+header('Content-Type: application/json');
+echo json_encode($response);
 ?>
