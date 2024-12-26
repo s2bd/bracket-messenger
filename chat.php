@@ -34,12 +34,14 @@ function fetchChats($conn, $userId) {
     while ($row = $result->fetch_assoc()) {
         // Format the timestamp to a more user-friendly format
         $timestamp = new DateTime($row['latest_timestamp']);
-        $formattedTimestamp = $timestamp->format('Y-m-d H:i:s'); // Format as YYYY-MM-DD HH:MM:SS
+        $latestDate = $timestamp->format('d-m-Y'); // Date format for the conversation flow
+        $latestTime = $timestamp->format('H:i:s'); // Time format for individual messages
 
         $chatsHTML .= "<div class='chat-entry' data-chat-id='{$row['chat_id']}'>
-                          <strong>{$row['creator_name']}</strong><br>
-                          <span>{$row['latest_message']}</span><br>
-                          <small>{$formattedTimestamp}</small>
+                        <strong>{$row['creator_name']}</strong><br>
+                        <span>{$row['latest_message']}</span><br>
+                        <small class='timestamp-date'>{$latestDate}</small><br>
+                        <small class='timestamp-time'>{$latestTime}</small>
                         </div>";
     }
 
@@ -66,11 +68,16 @@ function fetchMessages($conn, $userId, $chatId) {
     $messagesHTML = '';
     while ($row = $result->fetch_assoc()) {
         $class = $row['sender_id'] == $userId ? 'sender' : 'receiver';
+        // Format individual message timestamps
+        $messageTimestamp = new DateTime($row['timestamp']);
+        $messageTime = $messageTimestamp->format('H:i:s'); // Time format only
+
         $messagesHTML .= "<div class='message $class'>
-                             <strong>{$row['display_name']}</strong><br>
-                             <span>{$row['body']}</span><br>
-                             <small>{$row['timestamp']}</small>
-                           </div>";
+                            <strong>{$row['display_name']}</strong><br>
+                            <span>{$row['body']}</span><br>
+                            <small class='message-time'>{$messageTime}</small>
+                        </div>";
+
     }
     return $messagesHTML;
 }
@@ -186,6 +193,7 @@ if ($action === 'fetchChats') {
         <button class="new-chat-btn" id="newChatButton">+ New Chat</button>
         <?= fetchChats($conn, $userId) ?>
     </div>
+
     <div class="chat-conversation" id="chatConversation">
         <div class="messages" id="messages">
             <!-- Messages will be dynamically loaded here -->
