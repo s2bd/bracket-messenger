@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error_message = "User not found.";
         }
     } elseif (isset($_POST['action']) && $_POST['action'] == 'register') {
-        // Handle registration
+        // User registration
         $username = $conn->real_escape_string($_POST['username']);
         $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
         $display_name = $conn->real_escape_string($_POST['display_name']);
@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="css/index.css">
 </head>
 <body>
+    <div class="floating-title">
+        <h1>BRACKET</h1>
+        <p>Socializing on the Go</p>
+    </div>
     <div class="container" id="loginContainer" style="<?= isset($_POST['action']) && $_POST['action'] == 'register' ? 'display: none;' : 'display: block;' ?>">
         <h2>Login</h2>
         <?php if (isset($error_message) && $_POST['action'] == 'login'): ?>
@@ -93,13 +97,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </div>
 
-    <script>
-        function toggleForm() {
-            const loginContainer = document.getElementById('loginContainer');
-            const registerContainer = document.getElementById('registerContainer');
-            loginContainer.style.display = loginContainer.style.display === 'none' ? 'block' : 'none';
-            registerContainer.style.display = registerContainer.style.display === 'none' ? 'block' : 'none';
-        }
-    </script>
+    <div class="about-panel" onclick="toggleAboutPanel()">About this platform</div>
+    <div class="photo-credits">
+        Photo by <a href="https://unsplash.com/@simon_berger?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Simon Berger</a> on <a href="https://unsplash.com/photos/landscape-photography-of-mountains-twukN12EN7c?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a>
+    </div>
+
+    <script src="js/index.js"></script>
 </body>
 </html>

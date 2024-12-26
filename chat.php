@@ -92,6 +92,33 @@ function fetchMessages($conn, $userId, $chatId) {
     return $messagesHTML;
 }
 
+function fetchChatInfo($conn, $chatId, $userId) {
+    $query = "
+        SELECT u.display_name
+        FROM Chat_Members cm
+        JOIN User u ON u.user_id = cm.user_id
+        WHERE cm.chat_id = $chatId
+    ";
+
+    $result = $conn->query($query);
+    $members = [];
+    $currentUserName = '';
+
+    while ($row = $result->fetch_assoc()) {
+        if ($row['display_name'] === $_SESSION['user_name']) { // Assuming you store the user's name in session
+            $currentUserName = $row['display_name'];
+        } else {
+            $members[] = $row['display_name'];
+        }
+    }
+
+    return json_encode([
+        'membersNames' => implode(', ', $members),
+        'currentUserName' => $currentUserName
+    ]);
+}
+
+
 
 
 // Send message
@@ -174,6 +201,10 @@ if ($action === 'fetchChats') {
     $targetUserId = $_GET['userId'];
     echo getOrCreateChat($conn, $userId, $targetUserId);
     exit;
+} elseif ($action === 'fetchChatInfo' && isset($_GET['chat_id'])) {
+    $chatId = $_GET['chat_id'];
+    echo fetchChatInfo($conn, $chatId);
+    exit;
 }
 ?>
 
@@ -194,6 +225,15 @@ if ($action === 'fetchChats') {
     </div>
 
     <div class="chat-conversation" id="chatConversation">
+        <div class="chat-info-overlay" id="chatInfoOverlay">
+            <div class="chat-info-left">
+                <span>Chatting with: <span id="chatMembersDisplay"></span></span>
+            </div>
+            <div class="chat-info-right">
+                <span id="chatType"></span>
+            </div>
+        </div>
+        
         <div class="messages" id="messages">
             <div id="placeholderMessage" class="placeholder-message">Select a conversation to chat</div>
             <!-- Messages will be dynamically loaded here -->
