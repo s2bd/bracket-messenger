@@ -53,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login & Registration</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Bracket - Login</title>
+    <link rel="stylesheet" href="css/index.css">
 </head>
 <body>
     <div class="container" id="loginContainer" style="<?= isset($_POST['action']) && $_POST['action'] == 'register' ? 'display: none;' : 'display: block;' ?>">

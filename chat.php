@@ -4,7 +4,6 @@ session_start();
 $userId = $_SESSION['user_id'];
 
 // Fetch chat list
-// Fetch chat list
 function fetchChats($conn, $userId) {
     $query = "
         SELECT 
@@ -66,21 +65,34 @@ function fetchMessages($conn, $userId, $chatId) {
 
     $result = $conn->query($query);
     $messagesHTML = '';
+    $lastDate = null; // Initialize as null to track date changes
+    
     while ($row = $result->fetch_assoc()) {
         $class = $row['sender_id'] == $userId ? 'sender' : 'receiver';
-        // Format individual message timestamps
-        $messageTimestamp = new DateTime($row['timestamp']);
-        $messageTime = $messageTimestamp->format('H:i:s'); // Time format only
 
+        // Parse the message timestamp
+        $messageTimestamp = new DateTime($row['timestamp']);
+        $messageDate = $messageTimestamp->format('d-m-Y'); // Date for date markers
+        $messageTime = $messageTimestamp->format('H:i:s'); // Time for message display
+
+        // Add a date marker when the date changes or for the first message
+        if ($lastDate !== $messageDate) {
+            $messagesHTML .= "<div class='date-marker'><strong>{$messageDate}</strong></div>";
+            $lastDate = $messageDate; // Update the last date to the current one
+        }
+
+        // Add the actual message
         $messagesHTML .= "<div class='message $class'>
                             <strong>{$row['display_name']}</strong><br>
                             <span>{$row['body']}</span><br>
                             <small class='message-time'>{$messageTime}</small>
                         </div>";
-
     }
+
     return $messagesHTML;
 }
+
+
 
 // Send message
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sendMessage'])) {
@@ -185,8 +197,9 @@ if ($action === 'fetchChats') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Screen</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Bracket - Chat</title>
+    <link rel="stylesheet" href="css/chat.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="chat-list" id="chatList">
@@ -199,10 +212,13 @@ if ($action === 'fetchChats') {
             <!-- Messages will be dynamically loaded here -->
         </div>
         <div class="send-message">
-            <form method="POST" action="chat.php">
+            <form method="POST" action="chat.php" style="flex: 1; display: flex; gap: 0.5rem;">
                 <input type="hidden" name="chat_id" id="currentChatId">
-                <input type="text" id="messageInput" name="message" placeholder="Type a message...">
+                <input type="text" id="messageInput" name="message" placeholder="Type a message..." required>
                 <button type="submit" name="sendMessage" id="sendMessageButton">Send</button>
+                <button type="button" class="attachment-button" aria-label="Attach a file">
+                    <i class="fas fa-paperclip"></i>
+                </button>
             </form>
         </div>
     </div>
@@ -238,12 +254,14 @@ if ($action === 'fetchChats') {
                 return response.text();
             })
             .then(data => {
+                // Dynamically load messages including date markers
                 messages.innerHTML = data;
             })
             .catch(error => {
                 console.error('Error fetching messages:', error);
             });
     }
+
 
     function startMessageAutoRefresh(chatId) {
         if (refreshInterval) {
