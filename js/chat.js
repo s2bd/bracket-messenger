@@ -66,9 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Disable and reduce opacity
-    messageInput.disabled = true;
-    sendMessageButton.disabled = true;
-    attachmentButton.disabled = true;
+    //messageInput.disabled = true;
+    //sendMessageButton.disabled = true;
+    //attachmentButton.disabled = true;
     messageInput.style.opacity = '0.5'; 
     sendMessageButton.style.opacity = '0.5';
     attachmentButton.style.opacity = '0.5'; 
@@ -124,42 +124,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // User search functionality
     userSearchInput.addEventListener('input', () => {
-        const query = userSearchInput.value;
-        if (query.length < 3) return;
-
-        fetch(`search_user.php?query=${query}`)
+        const query = userSearchInput.value.trim();
+    
+        if (query.length < 3) {
+            userSearchResults.innerHTML = '<div>No results found</div>';
+            return;
+        }
+    
+        fetch(`searchUsers.php?query=${encodeURIComponent(query)}`)
             .then(response => response.json())
-            .then(users => {
+            .then(data => {
                 userSearchResults.innerHTML = '';
-                users.forEach(user => {
+    
+                if (data.error) {
+                    userSearchResults.innerHTML = `<div>${data.error}</div>`;
+                    return;
+                }
+    
+                if (data.users.length === 0) {
+                    userSearchResults.innerHTML = '<div>No results found</div>';
+                    return;
+                }
+    
+                data.users.forEach(user => {
                     const div = document.createElement('div');
                     div.textContent = user.display_name;
+                    div.className = 'user-search-result';
                     div.addEventListener('click', () => {
-                        fetch(`chat.php?action=checkExistingChat&userId=${user.user_id}`)
+                        fetch(`chat.php?action=getOrCreateChat&userId=${user.user_id}`)
                             .then(response => response.json())
-                            .then(data => {
-                                if (data.exists) {
-                                    alert('Chat already exists.');
+                            .then(chatData => {
+                                if (chatData.exists || chatData.success) {
+                                    currentChatId = chatData.chatId;
+                                    currentChatIdInput.value = currentChatId;
+                                    fetchMessages(currentChatId);
+                                    startMessageAutoRefresh(currentChatId);
+                                    newChatPopup.style.display = 'none';
                                 } else {
-                                    fetch(`chat.php?action=createNewChat&userId=${user.user_id}`)
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.success) {
-                                                currentChatId = data.chatId;
-                                                currentChatIdInput.value = currentChatId;
-                                                fetchMessages(currentChatId);
-                                                startMessageAutoRefresh(currentChatId);
-                                                newChatPopup.style.display = 'none';
-                                            }
-                                        })
-                                        .catch(error => console.error('Error creating chat:', error));
+                                    alert(`Error: ${chatData.error}`);
                                 }
                             })
-                            .catch(error => console.error('Error checking chat:', error));
+                            .catch(console.error);
                     });
                     userSearchResults.appendChild(div);
                 });
             })
-            .catch(error => console.error('Error searching users:', error));
+            .catch(error => {
+                console.error('Error searching users:', error);
+                userSearchResults.innerHTML = '<div>An error occurred while searching</div>';
+            });
     });
+    
+    
+
 });
+
