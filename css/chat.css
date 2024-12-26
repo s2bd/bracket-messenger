@@ -95,11 +95,15 @@ body {
     transition: transform 0.3s ease-in-out;
     border: 1px solid #ccc;
     cursor: pointer;
+    color: #fff;
 }
 
 .chat-list .chat-entry:hover {
     transform: scale(1.05);
     background: rgba(255, 255, 255, 0.15);
+}
+.chat-entry:active {
+    transform: scale(0.85);
 }
 
 .chat-entry small {
@@ -149,7 +153,7 @@ body {
 
 .chat-conversation .messages .message.sender {
     align-self: flex-end;
-    background-color: rgba(0, 128, 255, 0.3);
+    background-color: rgba(68, 0, 255, 0.867);
     color: #fff;
 }
 
@@ -265,6 +269,11 @@ button:hover {
     background-color: rgba(255, 255, 255, 0.35);
 }
 
+.message.sender:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+
 .message-time:hover {
     opacity: 0.9;
 }
@@ -304,24 +313,11 @@ button:hover {
 .send-message button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+    pointer-events: none;
 }
 
-.send-message .attachment-button {
-    flex: 1;
-    padding: 0.5rem;
-    border: none;
-    border-radius: 4px;
-    background-color: #6c757d;
-    color: #fff;
-    font-size: 1rem;
+.send-message button:enabled {
+    opacity: 1;
+    pointer-events: auto;
     cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 1.0;
-}
-
-.send-message .attachment-button i {
-    font-size: 1.2rem;
-    opacity: 1.0;
 }
