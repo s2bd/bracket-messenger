@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const userSearchInput = document.getElementById('userSearchInput');
     const userSearchResults = document.getElementById('userSearchResults');
     const closePopupButton = document.getElementById('closePopupButton');
+    const chatInfoOverlay = document.getElementById('chatInfoOverlay');
+    const chatMembersDisplay = document.getElementById('chatMembersDisplay');
+    const chatType = document.getElementById('chatType');
 
     let currentChatId = null;
     let refreshInterval = null;
@@ -51,19 +54,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatEntry) {
             currentChatId = chatEntry.dataset.chatId;
             currentChatIdInput.value = currentChatId;
-
-            // Re-enable and reset opacity
+    
+            // Re-enable input and fetch messages
             messageInput.disabled = false; 
             sendMessageButton.disabled = false;
-            //attachmentButton.disabled = false; // attachment feature not ready yet!
+            attachmentButton.disabled = false; 
             messageInput.style.opacity = '1';  
             sendMessageButton.style.opacity = '1';
             attachmentButton.style.opacity = '1'; 
-
-            fetchMessages(currentChatId);  // Load messages for the selected chat
-            startMessageAutoRefresh(currentChatId);  // Start auto-refreshing messages
+    
+            fetchMessages(currentChatId);  // Load messages
+            startMessageAutoRefresh(currentChatId);  // Start auto-refreshing
+    
+            // Fetch chat info
+            fetch(`chat.php?action=fetchChatInfo&chat_id=${currentChatId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch chat info');
+                    return response.json();
+                })
+                .then(data => {
+                    // Update chat info overlay
+                    const members = data.membersNames.split(', ');
+                    const currentUserName = data.currentUserName;
+                    const otherMembers = members.filter(name => name !== currentUserName);
+    
+                    let chatTypeText = otherMembers.length === 1 
+                        ? 'DM' 
+                        : `${otherMembers.length + 1} members`;
+    
+                    chatMembersDisplay.textContent = otherMembers.join(', ');
+                    chatType.textContent = chatTypeText;
+                })
+                .catch(error => {
+                    console.error('Error fetching chat info:', error);
+                });
         }
     });
+    
 
     // Disable and reduce opacity
     //messageInput.disabled = true;
@@ -122,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userSearchInput.value = '';       // Clear search input
     });
 
+
     // User search functionality
     userSearchInput.addEventListener('input', () => {
         const query = userSearchInput.value.trim();
@@ -178,4 +206,3 @@ document.addEventListener('DOMContentLoaded', () => {
     
 
 });
-
