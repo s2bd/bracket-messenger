@@ -1,9 +1,8 @@
 <?php
-include 'db_connection.php';
-session_start();
-$userId = $_SESSION['user_id'];
+include 'db_connection.php'; // reference to the SQL database connection
+session_start(); // starting a session for the current user
+$userId = $_SESSION['user_id']; // using the user ID obtained from the login
 
-// Fetch chat list
 function fetchChats($conn, $userId) {
     $query = "
         SELECT 
@@ -22,33 +21,26 @@ function fetchChats($conn, $userId) {
             WHERE chat_id = c.chat_id
         )
         ORDER BY latest_timestamp DESC;
-    ";
+    "; // using SQL statements to retrieve the chats that the user is part of
 
-    $result = $conn->query($query);
-    $chatsHTML = '';
+    $result = $conn->query($query); // using a lambda function to send the query via the PHP-SQL connection
+    $chatsHTML = ''; // preparing a blank HTML code for adding all dynamic content later on
 
-    // Set the default timezone to UTC (or your preferred timezone)
-    date_default_timezone_set('UTC');
+    date_default_timezone_set('UTC'); // setting the timezone of the server as UTC
     
     while ($row = $result->fetch_assoc()) {
-        // Format the timestamp to a more user-friendly format
-        $timestamp = new DateTime($row['latest_timestamp']);
-        $latestDate = $timestamp->format('d-m-Y'); // Date format for the conversation flow
-        $latestTime = $timestamp->format('H:i:s'); // Time format for individual messages
-
+        $timestamp = new DateTime($row['latest_timestamp']); // formatting the timestamp to be more user-friendly
+        $latestDate = $timestamp->format('d-m-Y'); // date format for the conversation flow
+        $latestTime = $timestamp->format('H:i:s'); // time format for the individual messages
         $chatsHTML .= "<div class='chat-entry' data-chat-id='{$row['chat_id']}'>
                         <strong>{$row['creator_name']}</strong><br>
                         <span>{$row['latest_message']}</span><br>
-                        <small class='timestamp-date'>{$latestDate}</small><br>
-                        <small class='timestamp-time'>{$latestTime}</small>
-                        </div>";
+                        <small class='timestamp-time'>{$latestDate} {$latestTime}</small>
+                        </div>"; // template HTML block for each chat
     }
-
-    return $chatsHTML;
+    return $chatsHTML; // add all the chats to the collection of HTML code and return
 }
 
-
-// Fetch messages for a specific chat
 function fetchMessages($conn, $userId, $chatId) {
     $query = "
         SELECT 
@@ -61,17 +53,16 @@ function fetchMessages($conn, $userId, $chatId) {
         JOIN Chat_Members cm ON cm.chat_id = m.chat_id
         WHERE cm.user_id = $userId AND m.chat_id = $chatId
         ORDER BY m.timestamp ASC
-    ";
+    "; // using SQL queries for retrieving messages belonging to a chat
 
-    $result = $conn->query($query);
-    $messagesHTML = '';
-    $lastDate = null; // Initialize as null to track date changes
+    $result = $conn->query($query); // sending them over via lambda
+    $messagesHTML = ''; // preparing blank HTML
+    $lastDate = null;
     
     while ($row = $result->fetch_assoc()) {
         $class = $row['sender_id'] == $userId ? 'sender' : 'receiver';
 
-        // Parse the message timestamp
-        $messageTimestamp = new DateTime($row['timestamp']);
+        $messageTimestamp = new DateTime($row['timestamp']); // Parse the message timestamp
         $messageDate = $messageTimestamp->format('d-m-Y'); // Date for date markers
         $messageTime = $messageTimestamp->format('H:i:s'); // Time for message display
 
@@ -209,6 +200,7 @@ if ($action === 'fetchChats') {
 
     <div class="chat-conversation" id="chatConversation">
         <div class="messages" id="messages">
+            <div id="placeholderMessage" class="placeholder-message">Select a conversation to chat</div>
             <!-- Messages will be dynamically loaded here -->
         </div>
         <div class="send-message">
@@ -216,7 +208,7 @@ if ($action === 'fetchChats') {
                 <input type="hidden" name="chat_id" id="currentChatId">
                 <input type="text" id="messageInput" name="message" placeholder="Type a message..." required>
                 <button type="submit" name="sendMessage" id="sendMessageButton">Send</button>
-                <button type="button" class="attachment-button" aria-label="Attach a file">
+                <button type="button" name="attachment-button" id="attachmentButton" aria-label="Attach a file">
                     <i class="fas fa-paperclip"></i>
                 </button>
             </form>
@@ -231,146 +223,7 @@ if ($action === 'fetchChats') {
         <button class="close-btn" id="closePopupButton">Close</button>
     </div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-    const chatList = document.getElementById('chatList');
-    const messages = document.getElementById('messages');
-    const messageInput = document.getElementById('messageInput');
-    const sendMessageButton = document.getElementById('sendMessageButton');
-    const newChatButton = document.getElementById('newChatButton');
-    const newChatPopup = document.getElementById('newChatPopup');
-    const userSearchInput = document.getElementById('userSearchInput');
-    const userSearchResults = document.getElementById('userSearchResults');
-    const closePopupButton = document.getElementById('closePopupButton');
-    const currentChatIdInput = document.getElementById('currentChatId');
-
-    let currentChatId = null;
-    let refreshInterval = null;
-
-    function fetchMessages(chatId) {
-        fetch(`chat.php?action=fetchMessages&chat_id=${chatId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Failed to fetch messages');
-                return response.text();
-            })
-            .then(data => {
-                // Dynamically load messages including date markers
-                messages.innerHTML = data;
-            })
-            .catch(error => {
-                console.error('Error fetching messages:', error);
-            });
-    }
-
-
-    function startMessageAutoRefresh(chatId) {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-        }
-        refreshInterval = setInterval(() => {
-            fetchMessages(chatId);
-        }, 5000); // Refresh every few seconds
-    }
-
-    chatList.addEventListener('click', (e) => {
-        const target = e.target.closest('.chat-entry');
-        if (target) {
-            currentChatId = target.dataset.chatId;
-            currentChatIdInput.value = currentChatId;
-            fetchMessages(currentChatId);
-            startMessageAutoRefresh(currentChatId);
-        }
-    });
-
-    sendMessageButton.addEventListener('click', (e) => {
-        e.preventDefault(); // Prevent page reload
-        const chatId = currentChatIdInput.value;
-        const message = messageInput.value.trim();
-
-        if (!chatId || !message) return; // Avoid empty messages or missing chatId
-
-        fetch('chat.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                sendMessage: true,
-                chat_id: chatId,
-                message: message
-            })
-        })
-            .then(response => {
-                if (!response.ok) throw new Error('Failed to send message');
-                return response.text();
-            })
-            .then(() => {
-                fetchMessages(chatId);
-                messageInput.value = ''; // Clear input after sending
-            })
-            .catch(error => {
-                console.error('Error sending message:', error);
-            });
-    });
-
-    closePopupButton.addEventListener('click', () => {
-        newChatPopup.style.display = 'none';
-        userSearchResults.innerHTML = ''; // Clear search results
-        userSearchInput.value = '';       // Clear search input
-    });
-
-    newChatButton.addEventListener('click', () => {
-        newChatPopup.style.display = 'block';
-    });
-
-    userSearchInput.addEventListener('input', () => {
-        const query = userSearchInput.value;
-        if (query.length < 3) return;
-
-        fetch(`search_user.php?query=${query}`)
-            .then(response => response.json())
-            .then(users => {
-                userSearchResults.innerHTML = '';
-                users.forEach(user => {
-                    const div = document.createElement('div');
-                    div.textContent = user.display_name;
-                    div.addEventListener('click', () => {
-                        fetch(`chat.php?action=checkExistingChat&userId=${user.user_id}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.exists) {
-                                    alert('Chat already exists.');
-                                } else {
-                                    fetch(`chat.php?action=createNewChat&userId=${user.user_id}`)
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.success) {
-                                                currentChatId = data.chatId;
-                                                currentChatIdInput.value = currentChatId;
-                                                fetchMessages(currentChatId);
-                                                startMessageAutoRefresh(currentChatId);
-                                                newChatPopup.style.display = 'none';
-                                            }
-                                        })
-                                        .catch(error => console.error('Error creating chat:', error));
-                                }
-                            })
-                            .catch(error => console.error('Error checking chat:', error));
-                    });
-                    userSearchResults.appendChild(div);
-                });
-            })
-            .catch(error => console.error('Error searching users:', error));
-    });
-
-    window.addEventListener('beforeunload', () => {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-        }
-    });
-});
-
-
-
-</script>
+    <script src="js/chat.js"></script>
 
 </body>
 </html>
