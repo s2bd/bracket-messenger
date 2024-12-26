@@ -321,3 +321,29 @@ button:hover {
     pointer-events: auto;
     cursor: pointer;
 }
+
+.chat-info-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px; /* Adjust height as needed */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.2); /* translucent background */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+}
+
+.chat-info-left {
+    text-align: left;
+    font-size: 14px;
+}
+
+.chat-info-right {
+    text-align: right;
+    font-size: 14px;
+}
