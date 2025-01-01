@@ -53,7 +53,8 @@ function fetchChats($conn, $userId) {
 function fetchMessages($conn, $userId, $chatId) {
     $query = "
         SELECT 
-            u.display_name, 
+            u.display_name,
+            m.message_id, 
             m.body, 
             m.sender_id, 
             m.timestamp
@@ -82,11 +83,24 @@ function fetchMessages($conn, $userId, $chatId) {
         }
 
         // Add the actual message
-        $messagesHTML .= "<div class='message $class'>
-                            <strong>{$row['display_name']}</strong><br>
-                            <span>{$row['body']}</span><br>
-                            <small class='message-time'>{$messageTime}</small>
-                        </div>";
+        $messagesHTML .= "
+        <div class='message $class' data-message-id='{$row['message_id']}'>
+            <strong>{$row['display_name']}</strong><br>
+            <span>{$row['body']}</span><br>
+            <small class='message-time'>{$messageTime}</small>";
+
+        if ($row['sender_id'] == $userId) { // Add delete icon for sender messages
+            $messagesHTML .= "
+                <form method='POST' action='chat.php' style='display:inline;'>
+                    <input type='hidden' name='message_id' value='{$row['message_id']}'>
+                    <input type='hidden' name='deleteMessage' value='true'>
+                    <button type='submit' class='delete-icon' aria-label='Delete message'>
+                        <i class='fas fa-trash'></i>
+                    </button>
+                </form>";
+        }
+
+        $messagesHTML .= "</div>";
     }
 
     return $messagesHTML;
@@ -147,6 +161,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sendMessage'])) {
     $stmt->close();
 }
 
+// Delete message
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['deleteMessage'])) {
+    $messageId = $_POST['message_id'] ?? null;
+
+    $stmt = $conn->prepare("DELETE FROM Message WHERE message_id = ? AND sender_id = ?");
+    if (!$stmt) {
+        die("Error preparing statement: " . $conn->error);
+    }
+
+    $stmt->bind_param('ii', $messageId, $userId); // Ensure the message belongs to the current user
+    if (!$stmt->execute()) {
+        die("Error executing statement: " . $stmt->error);
+    }
+
+    $stmt->close();
+}
+
+
+function deleteMessage($conn, $messageId){
+    
+}
 
 // Check if an existing chat exists with a user
 function getOrCreateChat($conn, $userId, $targetUserId) {
