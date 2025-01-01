@@ -347,3 +347,61 @@ button:hover {
     text-align: right;
     font-size: 14px;
 }
+
+.delete-icon {
+    display: none; /* Hidden by default */
+    color: red;
+    cursor: pointer;
+    border: 1px solid red;
+    border-radius: 50%;
+    padding: 5px;
+    font-size: 0.9rem;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: white;
+}
+
+.message:hover .delete-icon {
+    display: inline-block; /* Show on hover */
+}
+
+
+/* Style for the delete icon container */
+.message .delete-icon {
+    position: absolute;
+    top: 50%;
+    right: -15px;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0; /* Hidden by default */
+    transition: all 0.3s ease;
+}
+
+/* Hover effects for the delete icon */
+.message:hover .delete-icon {
+    opacity: 1; /* Show icon on message hover */
+}
+
+.message .delete-icon:hover {
+    background: rgba(255, 0, 0, 0.8); /* Red background on hover */
+    color: white;
+}
+
+/* Adjust sender and receiver messages to account for delete icon spacing */
+.message.sender {
+    margin-right: 40px; /* Space for delete icon */
+}
+
+.message.receiver {
+    margin-left: 40px; /* In case a similar feature is added for receivers */
+}
